@@ -1,0 +1,127 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report, confusion_matrix
+
+# --- 1. Load Data ---
+# ASSUMPTION: The target column is at index 0 in BOTH files.
+try:
+    # Adjust paths if your files are in a specific Kaggle directory (e.g., '../input/yourdata/train.csv')
+    train_data = pd.read_csv('/kaggle/input/fashionmnist/fashion-mnist_train.csv')
+    test_data = pd.read_csv('/kaggle/input/fashionmnist/fashion-mnist_test.csv')
+    print("Data loaded successfully from train.csv and test.csv.")
+except FileNotFoundError as e:
+    print(f"Error loading file: {e}. Please check your file paths.")
+    # Exit or handle error gracefully
+    
+# --- 2. Data Preparation ---
+
+# Separate features (X) and target (y) for the training set
+y_train = train_data.iloc[:, 0]  # Target (Labels)
+X_train = train_data.iloc[:, 1:] # Features (e.g., Pixel values)
+
+# Separate features (X) and target (y) for the testing set
+y_test = test_data.iloc[:, 0]
+X_test = test_data.iloc[:, 1:]
+
+# Normalize feature data (Pixel values: 0-255 -> 0-1)
+
+print(f"Training samples: {len(X_train)}, Testing samples: {len(X_test)}")
+
+# --- 3. Model Training ---
+print("\nTraining Random Forest Classifier...")
+# In Step 3: Model Training
+rf_model = RandomForestClassifier(
+    n_estimators=200,             # Increase trees for stability (better performance)
+    max_depth=20,                 # Limit maximum depth (helps generalization)
+    min_samples_split=5,          # Require more samples to split a node
+    random_state=42,
+    n_jobs=-1
+)
+rf_model.fit(X_train, y_train)
+print("Training complete.")
+
+# --- 4. Prediction ---
+y_pred = rf_model.predict(X_test)
+
+# --- 5. Evaluation: Accuracy, Precision, Recall, F1-Score ---
+print("\n--- Model Performance Metrics ---")
+
+# a. Accuracy Score
+accuracy = accuracy_score(y_test, y_pred)
+precision = precision_score(y_test, y_pred, average='macro', zero_division=0)
+recall = recall_score(y_test, y_pred, average='macro', zero_division=0)
+f1 = f1_score(y_test, y_pred, average='macro', zero_division=0)
+print(f"Accuracy: {accuracy:.4f}")
+
+# b. Detailed Classification Report
+print("\nClassification Report (Precision, Recall, F1-Score per class):")
+report = classification_report(y_test, y_pred)
+print(report)
+
+# --- 6. Visualization: Confusion Matrix ---
+
+class_names = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat',
+               'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot']
+
+# Vẽ biểu đồ tổng hợp
+fig = plt.figure(figsize=(16, 12))
+gs = fig.add_gridspec(3, 2, hspace=0.3, wspace=0.3)
+
+# Biểu đồ cột tổng hợp Accuracy, Precision, Recall, F1
+ax1 = fig.add_subplot(gs[0, 0])
+metrics = {'Metric': ['Accuracy', 'Precision', 'Recall', 'F1-Score'],
+           'Score': [accuracy*100, precision*100, recall*100, f1*100]}
+bars = ax1.bar(metrics['Metric'], metrics['Score'],
+               color=['#4f46e5','#8b5cf6','#ec4899','#10b981'], edgecolor='black')
+ax1.set_ylim([0,105])
+ax1.set_title('Overall Performance Metrics')
+for bar in bars:
+    h = bar.get_height()
+    ax1.text(bar.get_x()+bar.get_width()/2., h+1, f'{h:.1f}%', ha='center', fontsize=11)
+
+# Biểu đồ Precision, Recall, F1 theo class
+report = classification_report(y_test, y_pred, target_names=class_names, output_dict=True)
+ax2 = fig.add_subplot(gs[0,1])
+x = np.arange(len(class_names))
+width = 0.25
+ax2.bar(x - width, [report[c]['precision']*100 for c in class_names], width, label='Precision', color='#8b5cf6')
+ax2.bar(x, [report[c]['recall']*100 for c in class_names], width, label='Recall', color='#ec4899')
+ax2.bar(x + width, [report[c]['f1-score']*100 for c in class_names], width, label='F1-Score', color='#10b981')
+ax2.set_xticks(x)
+ax2.set_xticklabels(class_names, rotation=45, ha='right')
+ax2.legend()
+ax2.set_ylim([0,105])
+ax2.set_title('Per-Class Performance')
+
+# Confusion Matrix
+cm = confusion_matrix(y_test, y_pred)
+ax3 = fig.add_subplot(gs[1,:])
+im = ax3.imshow(cm, cmap='Blues', aspect='auto')
+for i in range(len(class_names)):
+    for j in range(len(class_names)):
+        ax3.text(j, i, cm[i,j], ha='center', va='center',
+                 color='white' if cm[i,j]>cm.max()/2 else 'black', fontsize=9)
+ax3.set_xticks(np.arange(len(class_names)))
+ax3.set_yticks(np.arange(len(class_names)))
+ax3.set_xticklabels(class_names, rotation=45, ha='right')
+ax3.set_yticklabels(class_names)
+ax3.set_title('Confusion Matrix')
+plt.colorbar(im, ax=ax3)
+
+# Accuracy theo class
+ax4 = fig.add_subplot(gs[2,:])
+class_acc = [(y_pred[y_test==i]==y_test[y_test==i]).mean()*100 for i in range(10)]
+bars = ax4.barh(class_names, class_acc, color='#4f46e5', edgecolor='black')
+for i, acc in enumerate(class_acc):
+    ax4.text(acc+1, i, f'{acc:.1f}%', va='center', fontsize=10)
+ax4.set_xlim([0,105])
+ax4.set_title('Accuracy by Class')
+
+# Hiển thị và lưu biểu đồ
+plt.tight_layout()
+plt.savefig('rf_fashion_mnist_results.png', dpi=300, bbox_inches='tight')
+plt.show()
+print("\nConfusion Matrix visualization displayed successfully.")
