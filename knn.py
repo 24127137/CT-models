@@ -106,7 +106,3 @@ ax4.set_title('Accuracy by Class')
 plt.tight_layout()
 plt.savefig('knn_fashion_mnist_results.png', dpi=300, bbox_inches='tight')
 plt.show()
-Accuracy: 0.8573
-Precision: 0.8599
-Recall: 0.8573
-F1 Score: 0.8563
